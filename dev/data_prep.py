@@ -43,4 +43,26 @@ class TrainAndVal:
             'Y': cp.array(self.val_set['labels']).flatten()
         }
         
+def normalize(method, dataset):
+    
+  if method == 'zscore':
+      ds = dataset.copy()
+      u = ds.mean(axis=0)
+      std = ds.std(axis=0)
+      
+      arr_normalized = (ds - u)/std
+      
+      return arr_normalized
+  
+  elif method == 'minmax':
+      ds = dataset.copy()
+      min_cols = ds.min(axis=0)
+      max_cols = ds.max(axis=0)
+      
+      arr_normalized = (ds - min_cols)/(max_cols - min_cols)
+      
+      return arr_normalized
 
+  else:
+      print('Método no disponible')
+      return dataset
