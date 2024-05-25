@@ -1,2 +1,2 @@
 # T2 DEEP LEARNING
-> accuracy = 100%
+> Mejor accuracy actual approx = 50%
