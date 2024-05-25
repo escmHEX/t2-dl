@@ -1,18 +1,12 @@
 import cupy as cp
 import numpy as np
+import hyp_opt as hyp
 
 def xavier_initialization(N_in, N_out):
     return cp.random.randn(N_in, N_out) * cp.sqrt(2.0 / (N_in + N_out))
 
-def sigmoid(x):
-    return 1 / (1 + cp.exp(-x))
-
-def sigmoid_derivative(x):
-    return x * (1 - x)
-
-def softmax(z):#z: vector resultante antes de funcion de activación en la última capa
-    exp_z = cp.exp(z - cp.max(z, axis=1, keepdims=True))  
-    return exp_z / cp.sum(exp_z, axis=1, keepdims=True) #retorna las probabilidades de las posibles clases
+def he_initialization(N_in, N_out):
+        return cp.random.randn(N_in, N_out) * cp.sqrt(2.0 /N_in)
 
 #mide la diferencia entre las probs p_pred creada por softmax y las etiquetas Y reales
 def cross_entropy_loss(p_pred, Y):
@@ -22,7 +16,7 @@ def cross_entropy_loss(p_pred, Y):
     return -cp.sum(Y * cp.log(prob_predicted))/Y.shape[0]
 
 def one_hot(y, num_classes):
-    if y.ndim > 1:  # Flatten the array if necessary
+    if y.ndim > 1: 
         y = y.flatten()
         
     one_hot_labels = cp.zeros((y.shape[0], num_classes))
@@ -30,19 +24,29 @@ def one_hot(y, num_classes):
     return one_hot_labels
 
 class MultiLayerNetwork:
-    def __init__(self, layer_sizes):
+    def __init__(self, layer_sizes, n): # fn - funcion activacion
         self.layer_sizes = layer_sizes
         self.weights = []
         self.biases = []
+        self.fn = hyp.activation_function(n)
+        self.softMax = hyp.activation_function('softmax')
+        
+        self.momentums = []
+        self.velocities = []
+        self.beta1 = 0.9
+        self.beta2 = 0.999
+        self.epsilon = 1e-8
 
         # Initialize weights and biases for each layer
         for i in range(len(layer_sizes) - 1):
             
-            # Usando inicialización Xavier para fn sigmoide
+            # Usando inicialización Xavier, asumiendo sigmoide
             weight = xavier_initialization(layer_sizes[i], layer_sizes[i + 1])
             bias = cp.zeros((1, layer_sizes[i + 1]))
             self.weights.append(weight)
             self.biases.append(bias)
+            self.momentums.append(np.zeros_like(self.weights[-1]))  
+            self.velocities.append(np.zeros_like(self.weights[-1]))
 
     def forward(self, inputs):
         self.activations = [inputs]
@@ -50,12 +54,12 @@ class MultiLayerNetwork:
 
         for i in range(len(self.weights) - 1):
             z = cp.dot(a, self.weights[i]) + self.biases[i]
-            a = sigmoid(z)
+            a = self.fn.value(z)
             self.activations.append(a)
 
         # Output uses softmax for multiclass classification
         z = cp.dot(a, self.weights[-1]) + self.biases[-1]
-        a = softmax(z)
+        a = self.softMax.value(z)
         self.activations.append(a)
         return a
 
@@ -65,15 +69,15 @@ class MultiLayerNetwork:
 
         for i in range(len(self.weights) - 1):
             z = cp.dot(a, self.weights[i]) + self.biases[i]
-            a = sigmoid(z)
+            a = self.fn.value(z)
         
         # Output with softmax
         z = cp.dot(a, self.weights[-1]) + self.biases[-1]
-        a = softmax(z)
+        a = self.softMax.value(z)
 
         return a
 
-    def backward(self, targets, learning_rate):
+    def backward(self, targets, learning_rate, t):
         m = targets.shape[0]  # number of training examples
         delta_weights = [0] * len(self.weights)
         delta_biases = [0] * len(self.biases)
@@ -89,11 +93,16 @@ class MultiLayerNetwork:
 
             if i != 0:
                 # Propagate the error to the previous layer
-                error = cp.dot(delta, self.weights[i].T) * sigmoid_derivative(self.activations[i])
-
-            # Update weights and biases
-            self.weights[i] -= learning_rate * delta_weights[i]
+                error = cp.dot(delta, self.weights[i].T) * self.fn.derivative(self.activations[i])
+            
+            # Actualizar pesos usando adam
+            self.momentums[i] = self.beta1 * self.momentums[i] + (1 - self.beta1) * delta_weights[i]
+            self.velocities[i] = self.beta2 * self.velocities[i] + (1 - self.beta2) * delta_weights[i]**2
+            m_hat = self.momentums[i] / (1 - self.beta1**(t + 1))
+            v_hat = self.velocities[i] / (1 - self.beta2**(t + 1))
+            self.weights[i] -= learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
             self.biases[i] -= learning_rate * delta_biases[i]
+
         
     def train(self, inputs, targets, epochs, learning_rate):
         targets = one_hot(targets, 10)
@@ -107,7 +116,7 @@ class MultiLayerNetwork:
         for epoch in range(epochs):
             predictions = self.forward(inputs)
             error = cross_entropy_loss(predictions, targets)
-            self.backward(targets, learning_rate)
+            self.backward(targets, learning_rate, epoch)
             errors.append(error)
             
             if epoch % 10 == 0:
