@@ -1,6 +1,6 @@
 import cupy as cp
 import numpy as np
-import hyp_opt as hyp
+from hyp_opt import activation_function
 
 def xavier_initialization(N_in, N_out):
     return cp.random.randn(N_in, N_out) * cp.sqrt(2.0 / (N_in + N_out))
@@ -28,8 +28,8 @@ class MultiLayerNetwork:
         self.layer_sizes = layer_sizes
         self.weights = []
         self.biases = []
-        self.fn = hyp.activation_function(n)
-        self.softMax = hyp.activation_function('softmax')
+        self.fn = activation_function(n)
+        self.softMax = activation_function('softmax')
         
         self.momentums = []
         self.velocities = []
@@ -41,7 +41,7 @@ class MultiLayerNetwork:
         for i in range(len(layer_sizes) - 1):
             
             # Usando inicialización Xavier, asumiendo sigmoide
-            weight = xavier_initialization(layer_sizes[i], layer_sizes[i + 1])
+            weight = he_initialization(layer_sizes[i], layer_sizes[i + 1])
             bias = cp.zeros((1, layer_sizes[i + 1]))
             self.weights.append(weight)
             self.biases.append(bias)
@@ -125,7 +125,7 @@ class MultiLayerNetwork:
                 if (last_error - error) < 0.0001: # si el costo mejora menos que esto durante 40 epocas seguidas, nos salimos
                     num_equal += 1
                     
-                if num_equal >= 4:
+                if num_equal >= 6:
                     return errors
                 
                 last_error = error
