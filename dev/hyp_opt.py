@@ -1,5 +1,7 @@
 import cupy as cp
-# Se busca optimizar: Cantidad Capas, Cantidad Neuronas por capas, epochs y learning rate
+import model as m
+import numpy as np
+import data_prep as dp
 
 class activation_function:
     def __init__(self, n): #n = nombre fn a usar
@@ -69,3 +71,5 @@ class activation_function:
         else:
             print('derivada inexistente')
             return z  
+
+
