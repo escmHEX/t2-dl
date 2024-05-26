@@ -1,11 +1,11 @@
 import pandas as pd
 import cupy as cp
 
-class Dataset:
-    def __init__(self, path, isTrainAndVal=False):
+class Test:
+    def __init__(self, path):
         self.data = pd.read_csv(path).to_numpy()
         self.samples = self.data.shape[0]
-        self.features = self.data[:self.samples, 1:-1]
+        self.features = self.data[:self.samples, 1:]
         self.labels = self.data[:self.samples, -1]
         self.labels = self.labels.reshape(1, -1).T 
         
@@ -20,6 +20,7 @@ class TrainAndVal:
         self.data = pd.read_csv(path).to_numpy()
         self.samples = self.data.shape[0]
         self.train_samples = int(self.samples * train_percentage)
+        
         
         self.train_set = {
             'features': self.data[:self.train_samples, 1:-1],
@@ -42,6 +43,7 @@ class TrainAndVal:
             'X': cp.array(self.val_set['features']),
             'Y': cp.array(self.val_set['labels']).flatten()
         }
+        
         
 def normalize(method, dataset):
     
