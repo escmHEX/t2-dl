@@ -1,6 +1,27 @@
 import data_prep as dp
 import model
 import cupy as cp
+import numpy as np
+import csv
+
+def write_to_csv(data, filename):
+    # Abre el archivo CSV en modo de escritura
+    with open(filename, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        
+        csv_writer.writerow(['ID', 'label'])
+        for i, value in enumerate(data):
+            csv_writer.writerow([str(i), str(value)])
+
+def toClass(predictions):
+ indexes = []
+ for curClassPredictions in predictions:
+    curMax = np.max(curClassPredictions)
+    firstIndex = np.where(curClassPredictions == curMax)[0][0]
+    
+    indexes.append(firstIndex)
+ return indexes
+    
 
 # const
 img_size = 32
@@ -14,15 +35,15 @@ output_size = 10
 layer_sizes = [input_size] + hidden_layers + [output_size]
 
 # hyperparams
-fn_activation = 'sigmoid'
+fn_activation = 'relu'
 model = model.MultiLayerNetwork(layer_sizes, fn_activation)
-epochs = 600
+epochs = 300
 learning_rate = 0.001
 
 ########### SETS TRAIN, VAL, TEST ####################
 
 # train ds al 90%
-trainAndVal = dp.TrainAndVal('./sets/train_data.csv', train_percentage=0.9)
+trainAndVal = dp.TrainAndVal('./sets/train_data.csv', train_percentage=0.99)
 train_dataset = trainAndVal.get_train_data()
 X_train = train_dataset['X']
 y_train = train_dataset['Y']
@@ -40,8 +61,9 @@ X_val = dp.normalize('minmax', X_val)
 
 
 # test ds
-test_dataset = dp.Dataset('./sets/test_data.csv')
+test_dataset = dp.Test('./sets/test_data.csv')
 X_test = test_dataset.X_data()
+X_test = dp.normalize('minmax', X_test)
 y_test = test_dataset.Y_data() 
 
 
@@ -50,6 +72,11 @@ y_test = test_dataset.Y_data()
 errors = model.train(X_train, y_train, epochs, learning_rate)
 
 #Evaluar
-predictions = model.predict(X_val)
-accuracy = cp.mean(predictions.argmax(axis=1) == y_val)
-print(f'Test Accuracy validation set: {accuracy}')
+predictions = model.predict(X_test)
+
+filename = 'output.csv'  # Nombre del archivo CSV de salida
+predictions_list = toClass(predictions)
+write_to_csv(predictions_list, filename) 
+
+#accuracy = cp.mean(predictions.argmax(axis=1) == y_val)
+#print(f'Test Accuracy validation set: {accuracy}')
